@@ -271,6 +271,9 @@ public interface I_W_AD_OrgInfo extends I_AD_OrgInfo
 	  */
 	public String getlbr_IndAtividade();
 
+	public void setlbr_IndPerfil (String lbr_IndPerfil);
+	public String getlbr_IndPerfil();
+
     /** Column name lbr_Interest */
     public static final String COLUMNNAME_lbr_Interest = "lbr_Interest";
 
