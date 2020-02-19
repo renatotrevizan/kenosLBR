@@ -28,14 +28,17 @@ import org.adempierelbr.sped.efd.bean.RC500;
 import org.adempierelbr.sped.efd.bean.RD100;
 import org.adempierelbr.sped.efd.bean.RD500;
 import org.adempierelbr.sped.efd.bean.RE200;
+import org.adempierelbr.util.BPartnerUtil;
 import org.adempierelbr.util.LBRUtils;
 import org.adempierelbr.util.TextUtil;
 import org.adempierelbr.wrapper.I_W_AD_OrgInfo;
+import org.adempierelbr.wrapper.I_W_C_BPartner;
 import org.compiere.model.MAttachment;
 import org.compiere.model.MBPartner;
 import org.compiere.model.MElementValue;
 import org.compiere.model.MOrgInfo;
 import org.compiere.model.MProduct;
+import org.compiere.model.MUser;
 import org.compiere.model.Query;
 import org.compiere.process.ProcessInfoParameter;
 import org.compiere.process.SvrProcess;
@@ -210,7 +213,27 @@ public class ProcGenerateEFD extends SvrProcess
 		
 		if (sped.getBPAccountant () != null)
 		{
+			I_W_C_BPartner bpAccountant = sped.getBPAccountant ();
+			
 			Reg0100 reg0100 = reg0001.setReg0100(new Reg0100()).getReg0100();
+			reg0100.setNome(bpAccountant.getName());
+			reg0100.setCpf(bpAccountant.getlbr_CPF());
+//			reg0100.setCRC(bpAccountant.getLBR_CRC());
+			reg0100.setCnpj(bpAccountant.getlbr_CNPJ());
+			reg0100.setCep(contLoc.getPostal());
+			reg0100.setEnd(contLoc.getAddress1());
+			reg0100.setNum(contLoc.getAddress2());
+			reg0100.setCompl(contLoc.getAddress4());
+			reg0100.setBairro(contLoc.getAddress3());
+			reg0100.setFone(bpcontLoc.getPhone());
+			reg0100.setFax(bpcontLoc.getFax());
+			
+			// email
+			if (bpAccountant.getPrimaryAD_User_ID() > 0) 
+				reg0100.setEmail(MUser.get(ctx, bpContador.getPrimaryAD_User_ID()).getEMail());
+
+			// código do municipio do IBGE
+			reg0100.setCodMun(BPartnerUtil.getCityCode(contLoc));
 		}
 		
 		
