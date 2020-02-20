@@ -23,8 +23,10 @@ import org.adempierelbr.util.TextUtil;
 import org.adempierelbr.wrapper.I_W_AD_OrgInfo;
 import org.adempierelbr.wrapper.I_W_C_BPartner;
 import org.adempierelbr.wrapper.I_W_C_City;
+import org.compiere.model.MBPartnerLocation;
 import org.compiere.model.MCity;
 import org.compiere.model.MOrgInfo;
+import org.compiere.model.MUser;
 
 /**
  * 		Model for LBR_SPED
@@ -211,5 +213,22 @@ public class MLBRSPED extends X_LBR_SPED
 	public I_W_C_BPartner getBPAccountant()
 	{
 		return null;
+	}
+
+	public MBPartnerLocation getBPAccountantLoc()
+	{
+		return null;
+	}
+
+	public MUser getBPAccountantUser()
+	{
+		return null;
+	}
+
+	public boolean hasAccountant()
+	{
+		if (getBPAccountant() != null && getBPAccountantLoc() != null)
+			return true;
+		return false;
 	}
 }	//	MLBRSPED

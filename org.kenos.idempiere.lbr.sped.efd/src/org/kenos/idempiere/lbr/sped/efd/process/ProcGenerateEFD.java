@@ -1,11 +1,17 @@
 package org.kenos.idempiere.lbr.sped.efd.process;
 
+import static org.kenos.idempiere.lbr.sped.efd.util.SPEDUtil.IND_MOV_FALSE;
+import static org.kenos.idempiere.lbr.sped.efd.util.SPEDUtil.IND_MOV_TRUE;
+import static org.kenos.idempiere.lbr.sped.efd.util.SPEDUtil.toInteger;
+import static org.kenos.idempiere.lbr.sped.efd.util.SPEDUtil.toLong;
+
 import java.io.File;
 import java.math.BigDecimal;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.List;
@@ -24,9 +30,6 @@ import org.adempierelbr.sped.efd.bean.R0460;
 import org.adempierelbr.sped.efd.bean.R0500;
 import org.adempierelbr.sped.efd.bean.RC100;
 import org.adempierelbr.sped.efd.bean.RC190;
-import org.adempierelbr.sped.efd.bean.RC500;
-import org.adempierelbr.sped.efd.bean.RD100;
-import org.adempierelbr.sped.efd.bean.RD500;
 import org.adempierelbr.sped.efd.bean.RE200;
 import org.adempierelbr.util.BPartnerUtil;
 import org.adempierelbr.util.LBRUtils;
@@ -35,7 +38,9 @@ import org.adempierelbr.wrapper.I_W_AD_OrgInfo;
 import org.adempierelbr.wrapper.I_W_C_BPartner;
 import org.compiere.model.MAttachment;
 import org.compiere.model.MBPartner;
+import org.compiere.model.MBPartnerLocation;
 import org.compiere.model.MElementValue;
+import org.compiere.model.MLocation;
 import org.compiere.model.MOrgInfo;
 import org.compiere.model.MProduct;
 import org.compiere.model.MUser;
@@ -46,13 +51,20 @@ import org.compiere.util.DB;
 import org.compiere.util.Env;
 import org.kenos.idempiere.lbr.sped.efd.model.MLBRFactFiscal;
 import org.kenos.idempiere.lbr.sped.efd.model.MLBRSPED;
-import org.kenos.idempiere.lbr.sped.efd.util.SPEDUtil;
 
 import efd.icmsipi.bloco0.Reg0000;
 import efd.icmsipi.bloco0.n1.Reg0001;
 import efd.icmsipi.bloco0.n1.n2.Reg0005;
 import efd.icmsipi.bloco0.n1.n2.Reg0100;
-
+import efd.icmsipi.bloco0.n1.n2.Reg0150;
+import efd.icmsipi.bloco1.n1.Reg1001;
+import efd.icmsipi.bloco1.n1.n2.Reg1600;
+import efd.icmsipi.blocoC.n1.RegC001;
+import efd.icmsipi.blocoC.n1.n2.RegC100;
+import efd.icmsipi.blocoC.n1.n2.RegC500;
+import efd.icmsipi.blocoD.n1.RegD001;
+import efd.icmsipi.blocoD.n1.n2.RegD100;
+import efd.icmsipi.blocoD.n1.n2.RegD500;
 /**
  * 		Processo para geração do SPED EFD
  *	
@@ -199,7 +211,7 @@ public class ProcGenerateEFD extends SvrProcess
 		reg0000.setIndPerfil(sped.getProfile());	//	FIXME
 		reg0000.setIndAtiv(sped.getActivity());
 		
-		Reg0001 reg0001 = reg0000.setReg0001(new Reg0001(SPEDUtil.IND_MOV_TRUE)).getReg0001();
+		Reg0001 reg0001 = reg0000.setReg0001(new Reg0001(IND_MOV_TRUE)).getReg0001();
 		
 		Reg0005 reg0005 = reg0001.setReg0005(new Reg0005()).getReg0005();
 		reg0005.setFantasia(sped.getFantasia());
@@ -211,52 +223,64 @@ public class ProcGenerateEFD extends SvrProcess
 		reg0005.setFone(sped.getPhone());
 		reg0005.setEmail(sped.getEMail());
 		
-		if (sped.getBPAccountant () != null)
+		if (sped.hasAccountant ())
 		{
-			I_W_C_BPartner bpAccountant = sped.getBPAccountant ();
+			I_W_C_BPartner bpAcct = sped.getBPAccountant ();
+			MBPartnerLocation bpAcctBPLoc = sped.getBPAccountantLoc ();
+			MUser bpAcctUser = sped.getBPAccountantUser ();
+			MLocation bpAcctLoc = bpAcctBPLoc.getLocation(false);
 			
 			Reg0100 reg0100 = reg0001.setReg0100(new Reg0100()).getReg0100();
-			reg0100.setNome(bpAccountant.getName());
-			reg0100.setCpf(bpAccountant.getlbr_CPF());
-//			reg0100.setCRC(bpAccountant.getLBR_CRC());
-			reg0100.setCnpj(bpAccountant.getlbr_CNPJ());
-			reg0100.setCep(contLoc.getPostal());
-			reg0100.setEnd(contLoc.getAddress1());
-			reg0100.setNum(contLoc.getAddress2());
-			reg0100.setCompl(contLoc.getAddress4());
-			reg0100.setBairro(contLoc.getAddress3());
-			reg0100.setFone(bpcontLoc.getPhone());
-			reg0100.setFax(bpcontLoc.getFax());
+			reg0100.setNome(bpAcct.getName());
+			reg0100.setCpf(toLong (bpAcct.getlbr_CPF()));
+//			reg0100.setCRC(bpAcct.getLBR_CRC());
+			reg0100.setCnpj(toLong (bpAcct.getlbr_CNPJ()));
+			reg0100.setCep(toInteger (bpAcctLoc.getPostal()));
+			reg0100.setEnd(bpAcctLoc.getAddress1());
+			reg0100.setNum(bpAcctLoc.getAddress2());
+			reg0100.setCompl(bpAcctLoc.getAddress4());
+			reg0100.setBairro(bpAcctLoc.getAddress3());
+			reg0100.setFone(bpAcctBPLoc.getPhone());
+			reg0100.setFax(bpAcctBPLoc.getFax());
 			
-			// email
-			if (bpAccountant.getPrimaryAD_User_ID() > 0) 
-				reg0100.setEmail(MUser.get(ctx, bpContador.getPrimaryAD_User_ID()).getEMail());
+			if (bpAcctUser != null && bpAcctUser.getEMail() != null) 
+				reg0100.setEmail(bpAcctUser.getEMail());
 
-			// código do municipio do IBGE
-			reg0100.setCodMun(BPartnerUtil.getCityCode(contLoc));
+			reg0100.setCodMun(toInteger (BPartnerUtil.getCityCode(bpAcctLoc)));
 		}
-		
-		
-		
-				 		
-		// 0100 - contator
-		bloco0.setR0100(EFDUtil.createR0100(getCtx(), p_AD_Org_ID, null));
 		
 		// ultima nota fiscal do loop de fatos fiscais (somente auxiliar)
 		int last_LBR_NotaFiscal_ID = 0;
 		
-		// Headers
-		RC100 rc100 = null;
-		RC500 rc500 = null;
-		RD100 rd100 = null;
-		RD500 rd500 = null;
 		
-		for(MLBRSalesCardTotal card : cards)
+		Reg1001 reg1001 = reg0000.setReg1001(new Reg1001(cards.length > 0 ? IND_MOV_TRUE : IND_MOV_FALSE)).getReg1001();
+		List<Reg1600> reg1600s = reg1001.setReg1600(new ArrayList<Reg1600>()).getReg1600();
+		
+		//	Registro 1600
+		for (MLBRSalesCardTotal card : cards)
 		{
-			bloco1.addR1600(EFDUtil.createR1600(card));
+			Reg1600 reg = new Reg1600();
+			reg.setCodPart(TextUtil.retiraEspecial(card.getC_BPartner().getValue()));
+			reg.setTotCredito(card.getLBR_CreditCardAmt());
+			reg.setTotDebito(card.getLBR_DebitCardAmt());
+			//
+			reg1600s.add(reg);
 		}
 		
-		/**
+//		List<Reg0150> reg0150s = reg0001.setRegC100(new ArrayList<Reg0150>()).getReg0150();
+//		List<Reg0150> reg0150s = reg0001.setReg0150(new ArrayList<Reg0150>()).getReg0150();
+//		Map<String,Reg0150> reg0150s = new HashMap<String,Reg0150>();
+		
+		
+		RegC001 regC001 = reg0000.setRegC001(new RegC001()).getRegC001();
+		RegD001 regD001 = reg0000.setRegD001(new RegD001()).getRegD001();
+		//
+		List<RegC100> regC100 = regC001.setRegC100(new ArrayList<RegC100>()).getRegC100();
+		List<RegC500> regC500 = regC001.setRegC500(new ArrayList<RegC500>()).getRegC500();
+		List<RegD100> regD100 = regD001.setRegD100(new ArrayList<RegD100>()).getRegD100();
+		List<RegD500> regD500 = regD001.setRegD500(new ArrayList<RegD500>()).getRegD500();
+		
+		/*
 		 * Loop de Fatos Fiscais. 
 		 * 
 		 * 	Obs.: Os fatos fiscais repetem de acordo com o numero de linhas da NF. 
@@ -265,30 +289,55 @@ public class ProcGenerateEFD extends SvrProcess
 		 * 	Devido a observação acima, deve-se tomar cuidado para tratar os registros agrupados, 
 		 * 	como dados do corpo da NF 
 		 */
-		for(MLBRFactFiscal factFiscal : facts)
+		for (MLBRFactFiscal factFiscal : facts)
 		{
-
-			//
-			String REG = EFDUtil.getBlocoNFModel(EFDUtil.getCOD_MOD(factFiscal)); 
+			if (factFiscal.getDocumentNo() == null)
+				continue;
 			
-			if (factFiscal.getDocumentNo()==null)
-				REG="C999"; //para não criar os blocos, apagar depois!
+			String reg = EFDUtil.getRegType (factFiscal.getlbr_NFModel ());
 			
-			/*
-			 * Gerar somente dos blocos C(produtos) e D(servicos).
-			 */
-			if(!(REG.startsWith("C") || REG.startsWith("D")))
+			// 	Gerar somente dos blocos C (produtos) e D (serviços)
+			if (!reg.startsWith("C") && !reg.startsWith("D"))
 				continue;
 
-			/*
-			 * R0150 - Parceiros de Negócios
-			 */
-			bloco0.addr0150(EFDUtil.createR0150(factFiscal));
 			
-			/*
-			 * Criar registros da NF, pois o fato fiscal se refere a uma nova NF
-			 */
-			if(last_LBR_NotaFiscal_ID != factFiscal.getLBR_NotaFiscal_ID())
+			
+			//	TODO Criar 0150 com base no C100 e D100, etc
+			
+			
+	
+			// 	C100 - NF
+			if ("C100".equals (reg))
+			{
+				
+			}
+			
+			//	D100 - Conhecimentos de Transportes
+			else if ("D100".equals (reg))
+			{
+			}
+			
+			//	D500 - Conhecimentos de Telefonia
+			else if ("D500".equals (reg))
+			{
+			}
+			
+			//	C500 - Conhecimentos de Energia
+			else if ("C500".equals (reg))
+			{
+			}
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			//	Criar registros da NF, pois o fato fiscal se refere a uma nova NF
+			if (last_LBR_NotaFiscal_ID != factFiscal.getLBR_NotaFiscal_ID())
 			{
 				
 				// 
@@ -298,7 +347,7 @@ public class ProcGenerateEFD extends SvrProcess
 				/*
 				 * C100 - NFs
 				 */
-				if(REG.startsWith("C100"))
+				if(reg.startsWith("C100"))
 				{
 					// C100 - NF
 					rc100 = EFDUtil.createRC100(factFiscal);
@@ -331,7 +380,7 @@ public class ProcGenerateEFD extends SvrProcess
 				/*
 				 * D100 - Conhecimentos de Transportes
 				 */
-				else if(REG.startsWith("D100"))
+				else if(reg.startsWith("D100"))
 				{
 					// D100
 					rd100 = EFDUtil.createRD100(factFiscal);
@@ -341,7 +390,7 @@ public class ProcGenerateEFD extends SvrProcess
 				/*
 				 * D500 - Conhecimentos de Telefonia
 				 */
-				else if(REG.startsWith("D500"))
+				else if(reg.startsWith("D500"))
 				{
 					// D500
 					rd500 = EFDUtil.createRD500(factFiscal);
@@ -351,7 +400,7 @@ public class ProcGenerateEFD extends SvrProcess
 				/*
 				 * C500 - Conhecimentos de Energia
 				 */
-				else if(REG.startsWith("C500"))
+				else if(reg.startsWith("C500"))
 				{
 					// C500
 					rc500 = EFDUtil.createRC500(factFiscal);
@@ -363,19 +412,19 @@ public class ProcGenerateEFD extends SvrProcess
 			/*
 			 * Unidades
 			 */
-			if(REG.startsWith("C100"))
+			if(reg.startsWith("C100"))
 			bloco0.addr0190(EFDUtil.createR0190(factFiscal));
 			
 			/*
 			 * Produtos
 			 */;
-			 if(REG.startsWith("C100") || REG.startsWith("D100"))
+			 if(reg.startsWith("C100") || reg.startsWith("D100"))
 				bloco0.addr0200(EFDUtil.createR0200(factFiscal));
 			
 			/*
 			 * Add C170 ao C100
 			 */
-			if(REG.startsWith("C100"))
+			if(reg.startsWith("C100"))
 			{
 				blocoC.getrC100().get(blocoC.getrC100().indexOf(rc100)).
 					addrC170(EFDUtil.createRC170(factFiscal, blocoC.getrC100().
@@ -393,7 +442,7 @@ public class ProcGenerateEFD extends SvrProcess
 			/*
 			 * Add C590 ao C500
 			 */
-			if(REG.startsWith("C500"))
+			if(reg.startsWith("C500"))
 				blocoC.getrC500().get(blocoC.getrC500().indexOf(rc500))
 					.addrC590(EFDUtil.createRC590(factFiscal, blocoC.getrC500().
 							get(blocoC.getrC500().indexOf(rc500)).getrC590().size() + 1));
@@ -401,7 +450,7 @@ public class ProcGenerateEFD extends SvrProcess
 			/*
 			 * Add D110 ao D100
 			 */
-			if(REG.startsWith("D100") && factFiscal.getlbr_NFModel().equals("07"))
+			if(reg.startsWith("D100") && factFiscal.getlbr_NFModel().equals("07"))
 				blocoD.getrD100().get(blocoD.getrD100().indexOf(rd100))
 					.addrD110(EFDUtil.createRD110(factFiscal, blocoD.getrD100().
 							get(blocoD.getrD100().indexOf(rd100)).getrD110().size() + 1));
@@ -409,7 +458,7 @@ public class ProcGenerateEFD extends SvrProcess
 			/*
 			 * Add D590 ao D500
 			 */
-			if(REG.startsWith("D500"))
+			if(reg.startsWith("D500"))
 				blocoD.getrD500().get(blocoD.getrD500().indexOf(rd500))
 					.addrD590(EFDUtil.createRD590(factFiscal, blocoD.getrD500().
 							get(blocoD.getrD500().indexOf(rd500)).getrD590().size() + 1));
@@ -417,7 +466,7 @@ public class ProcGenerateEFD extends SvrProcess
 			/*
 			 * Add D190 ao D100
 			 */
-			if(REG.startsWith("D100"))
+			if(reg.startsWith("D100"))
 				blocoD.getrD100().get(blocoD.getrD100().indexOf(rd100))
 					.addrD190(EFDUtil.createRD190(factFiscal, blocoD.getrD100().
 							get(blocoD.getrD100().indexOf(rd100)).getrD110().size() + 1));
@@ -431,6 +480,17 @@ public class ProcGenerateEFD extends SvrProcess
 			last_LBR_NotaFiscal_ID = factFiscal.getLBR_NotaFiscal_ID();
 			
 		} // loop fatos fiscais
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
 		
 		
 		/**

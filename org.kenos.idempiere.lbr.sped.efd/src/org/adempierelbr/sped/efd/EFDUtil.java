@@ -163,15 +163,13 @@ public class EFDUtil {
 	
 	
 	/**
-	 * Retornar o bloco de registro ao qual o modelo de documento pertence
+	 * Retornar o registro que deve ser escriturado o documento fiscal
 	 * 
 	 * @param nfModel
 	 * @return C100, C400, C500, D100, D500
 	 */
-	public static String getBlocoNFModel(String nfModel) {
-
-		
-		//
+	public static String getRegType (String nfModel)
+	{
 		String nfReg = "";
 		
 		/*
@@ -217,7 +215,7 @@ public class EFDUtil {
 
 		return nfReg;
 
-	} // getNFHeaderReg
+	} 	// getRegType
 	
 	
 	
