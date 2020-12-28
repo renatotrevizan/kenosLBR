@@ -23,6 +23,9 @@ import org.adempierelbr.util.SignatureUtil;
 import org.adempierelbr.util.TextUtil;
 import org.adempierelbr.wrapper.I_W_AD_OrgInfo;
 import org.adempierelbr.wrapper.I_W_C_Invoice;
+import org.apache.axis2.AxisFault;
+import org.apache.axis2.context.ConfigurationContext;
+import org.apache.axis2.context.ConfigurationContextFactory;
 import org.apache.axis2.transport.http.HTTPConstants;
 import org.apache.xmlbeans.XmlCursor;
 import org.compiere.model.MBPartner;
@@ -32,8 +35,19 @@ import org.compiere.model.MProduct;
 import org.compiere.util.CLogger;
 import org.compiere.util.Env;
 
+import br.com.ginfes.cabecalhoV03.CabecalhoDocument;
+import br.com.ginfes.servicoEnviarLoteRpsEnvioV03.EnviarLoteRpsEnvioDocument;
+import br.com.ginfes.servicoEnviarLoteRpsEnvioV03.EnviarLoteRpsEnvioDocument.EnviarLoteRpsEnvio;
+import br.com.ginfes.servicoEnviarLoteRpsRespostaV03.EnviarLoteRpsRespostaDocument;
+import br.com.ginfes.servicoEnviarLoteRpsRespostaV03.EnviarLoteRpsRespostaDocument.EnviarLoteRpsResposta;
+import br.gov.sp.indaiatuba.deiss.prod.webservice.NfseWebServiceServiceStub;
+import br.gov.sp.indaiatuba.deiss.prod.webservice.NfseWebServiceServiceStub.CancelarNfseRequest;
+import br.gov.sp.indaiatuba.deiss.prod.webservice.NfseWebServiceServiceStub.Input;
+import br.gov.sp.indaiatuba.deiss.prod.webservice.NfseWebServiceServiceStub.RecepcionarLoteRpsRequest;
 import br.org.abrasf.nfse.CabecalhoDocument.Cabecalho;
 import br.org.abrasf.nfse.CancelarNfseEnvioDocument.CancelarNfseEnvio;
+import br.org.abrasf.nfse.GerarNfseEnvioDocument;
+import br.org.abrasf.nfse.GerarNfseEnvioDocument.GerarNfseEnvio;
 import br.org.abrasf.nfse.TcContato;
 import br.org.abrasf.nfse.TcCpfCnpj;
 import br.org.abrasf.nfse.TcDadosServico;
@@ -47,14 +61,14 @@ import br.org.abrasf.nfse.TcIdentificacaoTomador;
 import br.org.abrasf.nfse.TcInfDeclaracaoPrestacaoServico;
 import br.org.abrasf.nfse.TcInfPedidoCancelamento;
 import br.org.abrasf.nfse.TcInfRps;
+import br.org.abrasf.nfse.TcLoteRps;
+import br.org.abrasf.nfse.TcLoteRps.ListaRps;
 import br.org.abrasf.nfse.TcPedidoCancelamento;
 import br.org.abrasf.nfse.TcValoresDeclaracaoServico;
 import br.org.abrasf.nfse.TsCodigoMunicipioIbge;
 import br.org.abrasf.nfse.TsItemListaServico;
+import br.org.abrasf.nfse.TsVersao;
 import br.org.abrasf.nfse.webservice.NfseWSServiceStub;
-import br.org.abrasf.nfse.webservice.NfseWSServiceStub.CancelarNfseRequest;
-import br.org.abrasf.nfse.webservice.NfseWSServiceStub.GerarNfseRequest;
-import br.org.abrasf.nfse.webservice.NfseWSServiceStub.Input;
 
 /**
  * 		NFS-e de Cidades que Utilizam Abrasf Versão 2.03 - Ginfes
@@ -129,17 +143,38 @@ public class NFSeAbrasf203Impl implements INFSe
 		
 		// Data da NF
 		Calendar dateDoc = Calendar.getInstance();
-		dateDoc.setTime(nf.getDateDoc());		
+		
+		// Lote
+		dateDoc.setTime(nf.getDateDoc());
 		
 		//	Criar RPS
-		TcDeclaracaoPrestacaoServico rps = TcDeclaracaoPrestacaoServico.Factory.newInstance();
+		//	Envio do Lote RPS
+		br.org.abrasf.nfse.EnviarLoteRpsEnvioDocument enviarLotDoc = br.org.abrasf.nfse.EnviarLoteRpsEnvioDocument.Factory.newInstance();
+		br.org.abrasf.nfse.EnviarLoteRpsEnvioDocument.EnviarLoteRpsEnvio enviarLot = enviarLotDoc.addNewEnviarLoteRpsEnvio();
+			
+		br.org.abrasf.nfse.TcLoteRps loteRps = enviarLot.addNewLoteRps();
 		
-		XmlCursor cursor= rps.newCursor();
+		TcCpfCnpj cpfCnpjPrestador = TcCpfCnpj.Factory.newInstance();
+		cpfCnpjPrestador.setCnpj(TextUtil.retiraEspecial(nf.getlbr_CNPJ()));
+		
+		//	Identificação do Lote do RPS
+		loteRps.setNumeroLote(new BigDecimal(nf.getDocumentNo()).intValue());
+		loteRps.setCpfCnpj(cpfCnpjPrestador);
+		loteRps.setInscricaoMunicipal(TextUtil.retiraEspecial(nf.getlbr_OrgCCM()));
+		loteRps.setQuantidadeRps(1);
+		loteRps.setVersao("2.03");
+		
+		ListaRps lista = loteRps.addNewListaRps();
+		
+		//	Lista de RPS
+		TcDeclaracaoPrestacaoServico rps = lista.addNewRps();
+		
+		/*XmlCursor cursor= rps.newCursor();
 		cursor.toNextToken();
 		cursor.insertNamespace("A", namespace);
 		//For example
 		cursor.insertNamespace("xsi", "http://www.w3.org/2001/XMLSchema-instance");
-		cursor.dispose();
+		cursor.dispose();*/
 		
 		//	Detalhes da Declaração de Prestação de Serviço
 		TcInfDeclaracaoPrestacaoServico infdps = rps.addNewInfDeclaracaoPrestacaoServico();						
@@ -163,7 +198,7 @@ public class NFSeAbrasf203Impl implements INFSe
 
 		//	Inscrição Municipal Organização
 		if (nf.getlbr_OrgCCM() != null && !nf.getlbr_OrgCCM().isEmpty())
-			prestador.setInscricaoMunicipal(nf.getlbr_OrgCCM());
+			prestador.setInscricaoMunicipal(TextUtil.toNumeric(nf.getlbr_OrgCCM()));
 			
 		//	Identificação do Parceiro de Negócio Tomador do Serviço
 		TcDadosTomador dadosTomador = infdps.addNewTomador();
@@ -178,7 +213,7 @@ public class NFSeAbrasf203Impl implements INFSe
 		
 		//	Inscriçaõ Municipal do Parceiro de Negócio
 		if (partner.get_ValueAsString("LBR_CCM") != null && !partner.get_ValueAsString("LBR_CCM").isEmpty())
-			tomador.setInscricaoMunicipal(partner.get_ValueAsString("LBR_CCM"));
+			tomador.setInscricaoMunicipal(TextUtil.toNumeric(partner.get_ValueAsString("LBR_CCM")));
 		
 		//	Dados do Tomador do Serviço / Parceiro de Negócio
 		dadosTomador.setRazaoSocial(TextUtil.retiraEspecial(nf.getBPName()));
@@ -254,6 +289,13 @@ public class NFSeAbrasf203Impl implements INFSe
 		dadosServico.setIssRetido((byte)(winvoice.isLBR_HasWithhold() ? 1 : 1));
 		dadosServico.setCodigoMunicipio(nf.getlbr_BPCityCode());
 		
+		//	Se o código do serviço possui / Ex. 14.01/3530300
+		//	Valor Antes da Barra, Codigo do Serviço, Valor depois da Barra, Código de Tributação do Município
+		if (serviceCode.contains("/"))
+			dadosServico.setItemListaServico(TsItemListaServico.Enum.forString(serviceCode.substring(0, serviceCode.indexOf("/"))));
+		else
+			dadosServico.setItemListaServico(TsItemListaServico.Enum.forString(serviceCode));
+		
 		//	FIXME: Criar campo ExigibilidadeISS
 		/*	1 - Exigível;
 			2 - Não incidência;
@@ -298,15 +340,15 @@ public class NFSeAbrasf203Impl implements INFSe
 		try
 		{
 			//	Valida o documento
-			NFeUtil.validate (rps);
+			NFeUtil.validate (enviarLotDoc);
 			
 			//	Adiciona o Certificado
 			MLBRDigitalCertificate.setCertificate (nf.getCtx(), p_AD_Org_ID);
 			
 			//	Assina o XML
-			new SignatureUtil (orgInf, SignatureUtil.RPS, "nfd").sign (rps, rps.newCursor());
+ 			new SignatureUtil (orgInf, SignatureUtil.RPS, "").sign (enviarLotDoc, enviarLotDoc.newCursor());
 					
-			return rps.xmlText(NFeUtil.getXmlOpt()).getBytes(NFeUtil.NFE_ENCODING);
+			return enviarLotDoc.xmlText(NFeUtil.getXmlOpt()).getBytes(NFeUtil.NFE_ENCODING);
 		
 		}
 		catch (Exception e)
@@ -323,11 +365,30 @@ public class NFSeAbrasf203Impl implements INFSe
 	{		
 		return null;
 	}	//	getRPS
+	
+	public String getVersion ()
+	{
+		CabecalhoDocument headerDoc = CabecalhoDocument.Factory.newInstance();
+		br.com.ginfes.cabecalhoV03.CabecalhoDocument.Cabecalho header = headerDoc.addNewCabecalho();
+		header.setVersao("4");
+		header.setVersaoDados("4");
+		
+		return header.xmlText();
+	}
 
 	/**
 	 * 	Emissão de Nota Fiscal de Serviço de Forma Assincrona
 	 */
 	public boolean transmit (MLBRNotaFiscal nf) throws Exception
+	{
+		log.info ("NFSETransmit Process");		
+		
+		//if (nf.getlbr_BPCityCode())
+		return transmitIndaiatuba(nf);
+		
+	}	//	transmit
+	
+	private boolean transmitIndaiatuba(MLBRNotaFiscal nf) throws Exception
 	{
 		log.info ("NFSETransmit Process");	
 		
@@ -335,35 +396,120 @@ public class NFSeAbrasf203Impl implements INFSe
 		byte[] xmlData = nf.getAttachmentData("xml");
 		if (xmlData == null || xmlData.length == 0)
 			xmlData = getXML (nf);	//	Gera um novo XML
-			
-		String xml = new String (xmlData, NFeUtil.NFE_ENCODING);
-			
-		Cabecalho header = Cabecalho.Factory.newInstance();
-		header.setVersao("2.03");
-		header.setVersaoDados("");
 		
-		/**
-		 *	Enviar NF-e
-		 */
-		//
-		Input inputXmlNfse = new Input();
-		inputXmlNfse.setNfseCabecMsg(header.xmlText());
-		inputXmlNfse.setNfseDadosMsg(xml);
+		String xml = new String (xmlData, NFeUtil.NFE_ENCODING);
 		
 		//	Set certificate
 		MLBRDigitalCertificate.setCertificate (Env.getCtx(), nf.getAD_Org_ID());
 		
-		GerarNfseRequest gerarNfseRequest = new GerarNfseRequest();
-		gerarNfseRequest.setGerarNfseRequest(inputXmlNfse);
+		/**
+		 *	Enviar NF-e
+		 */
 		
-		NfseWSServiceStub nfseStub = new NfseWSServiceStub();
+		//	Create a context to inrease timeout
+		ConfigurationContext axisContext;
+		try 
+		{
+		    axisContext = ConfigurationContextFactory.createDefaultConfigurationContext();
+		} 
+		catch (Exception e) 
+		{
+		    throw new AxisFault(e.getMessage());
+		}
 		
-		nfseStub._getServiceClient().getOptions().setProperty(HTTPConstants.CHUNKED, false);	
-				
-		String result = nfseStub.gerarNfse(gerarNfseRequest).getGerarNfseResponse().getOutputXML();
+		axisContext.setProperty(HTTPConstants.CONNECTION_TIMEOUT, 120*1000);
+		axisContext.setProperty(HTTPConstants.SO_TIMEOUT, 120*1000);
 		
-		return true;
-	}	//	transmit
+		
+		//	Produção
+		NfseWebServiceServiceStub rpsStub = new NfseWebServiceServiceStub(axisContext);
+		
+		//	Homologação
+		br.gov.sp.indaiatuba.deiss.hom.webservice.NfseWebServiceServiceStub rpsStubHom = 
+				new br.gov.sp.indaiatuba.deiss.hom.webservice.NfseWebServiceServiceStub(axisContext);
+		
+		//	Mensagem de Retorno após enviar NFS-e para Emissão
+		String retornoEnvioXMLNFSe = "";
+		
+		//	Produção
+		if (MLBRNotaFiscal.LBR_NFEENV_Production.equals(nf.getlbr_NFeEnv()))
+		{
+			br.gov.sp.indaiatuba.deiss.prod.webservice.NfseWebServiceServiceStub.Input inputXmlNfse = new Input();
+			inputXmlNfse.setNfseCabecMsg(getVersion());
+			inputXmlNfse.setNfseDadosMsg(xml);
+
+			RecepcionarLoteRpsRequest rpsRequest = new RecepcionarLoteRpsRequest();
+			rpsRequest.setRecepcionarLoteRpsRequest(inputXmlNfse);
+			
+			retornoEnvioXMLNFSe = rpsStub.recepcionarLoteRps(rpsRequest).getRecepcionarLoteRpsResponse().getOutputXML();
+		}
+		//	Homologação
+		else
+		{
+			br.gov.sp.indaiatuba.deiss.hom.webservice.NfseWebServiceServiceStub.Input inputXmlNfse = 
+					new br.gov.sp.indaiatuba.deiss.hom.webservice.NfseWebServiceServiceStub.Input();
+			inputXmlNfse.setNfseCabecMsg(getVersion());
+			inputXmlNfse.setNfseDadosMsg(xml);
+			
+			br.gov.sp.indaiatuba.deiss.hom.webservice.NfseWebServiceServiceStub.RecepcionarLoteRpsRequest rpsRequest = 
+					new br.gov.sp.indaiatuba.deiss.hom.webservice.NfseWebServiceServiceStub.RecepcionarLoteRpsRequest();
+			
+			rpsRequest.setRecepcionarLoteRpsRequest(inputXmlNfse);
+			
+			retornoEnvioXMLNFSe = rpsStubHom.recepcionarLoteRps(rpsRequest).getRecepcionarLoteRpsResponse().getOutputXML();
+		}
+		
+		log.fine (retornoEnvioXMLNFSe);
+		
+		// Retorno do Envio do XML
+		EnviarLoteRpsResposta resposta = EnviarLoteRpsRespostaDocument.Factory.parse(retornoEnvioXMLNFSe).getEnviarLoteRpsResposta();
+		
+		try
+		{		
+			//	Adicionar Protocolo do Lote
+			if (resposta != null && !resposta.getProtocolo().isEmpty())
+			{
+				nf.setlbr_NFeProt(resposta.getProtocolo());
+				nf.save();			
+			}
+			else
+				throw new AdempiereException("Erro ao Transmitir NFS-e");
+		}
+		catch (Exception e)
+		{
+			//	Processar a Regex
+			//	Identifica a String Inteira = .+(Codigo>.+Correcao>).+
+			//	Substitui pelo grupo "$1"
+			String erro = retornoEnvioXMLNFSe.replaceAll(".+(Codigo>E.+Correcao>).+", "$1") // REGEX
+					.replaceAll("</ns4:Codigo><ns4:", "\n")
+					.replaceAll("</ns4:Mensagem><ns4:", "\n")
+					.replaceAll("</ns4:Correcao>", "")
+					.replaceAll(">", ":");
+
+			throw new AdempiereException(erro);
+		}
+			
+		// Aguardar 15 Seg para fazer a consulta da NFS-e
+		try 
+		{
+			//	Wait 15 secs before check if NF is processed
+			//		15 secs is the SeFaz recommended time, so using as a default
+			log.finer ("pause");
+			
+			Thread.sleep(15000);
+			
+			log.finer ("resume");
+			
+			//	Consultar NFS-e
+			return consult(nf);
+		} 
+		catch (InterruptedException ex)
+		{
+		    Thread.currentThread().interrupt();
+		}
+		
+		return false;
+	}
 	
 	/**
 	 * 	Transmissão de RPS em lote
@@ -1423,7 +1569,7 @@ public class NFSeAbrasf203Impl implements INFSe
 		inputXmlNfse.setNfseCabecMsg(header.xmlText());
 		inputXmlNfse.setNfseDadosMsg(cancelOrder.getInfPedidoCancelamento().xmlText());
 		
-		CancelarNfseRequest resquest = new CancelarNfseRequest();
+		CancelarNfseRequest resquest = 	new CancelarNfseRequest();
 		resquest.setCancelarNfseRequest(inputXmlNfse);
 		
 		try
@@ -1431,7 +1577,7 @@ public class NFSeAbrasf203Impl implements INFSe
 			//	Set certificate
 			MLBRDigitalCertificate.setCertificate (Env.getCtx(), nf.getAD_Org_ID());
 			
-			NfseWSServiceStub nfseStub = new NfseWSServiceStub();
+			NfseWebServiceServiceStub nfseStub = new NfseWebServiceServiceStub();
 			
 			nfseStub._getServiceClient().getOptions().setProperty(HTTPConstants.CHUNKED, false);	
 			
