@@ -70,6 +70,7 @@ import org.kenos.idempiere.lbr.base.model.SysConfig;
  * @author Mario Grigioni
  * @version $Id: ProcGenerateEFD, 07/02/2011, 09:43, mgrigioni
  */
+@Deprecated
 public class ProcGenerateEFD extends SvrProcess
 {
 	/** 

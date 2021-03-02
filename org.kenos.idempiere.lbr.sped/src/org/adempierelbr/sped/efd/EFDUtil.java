@@ -527,6 +527,19 @@ public class EFDUtil {
 		return true;
 	}
 	
+	/**
+	 * REGISTRO 0000: ABERTURA DO ARQUIVO DIGITAL E IDENTIFICAÇÃO DA ENTIDADE
+	 * 
+	 * @param dateFrom
+	 * @param dateTo
+	 * @param factFiscal
+	 * @return
+	 * @throws Exception
+	 */
+	@Deprecated
+	public static R0000 createR0000(Properties ctx, Timestamp dateFrom, Timestamp dateTo, int AD_Org_ID, String trxName) throws Exception {
+		return createR0000 (ctx, dateFrom, dateTo, AD_Org_ID, COD_VER, COD_FIN, trxName);
+	}
 	
 	/**
 	 * REGISTRO 0000: ABERTURA DO ARQUIVO DIGITAL E IDENTIFICAÇÃO DA ENTIDADE
@@ -538,7 +551,7 @@ public class EFDUtil {
 	 * @throws Exception
 	 */
 
-	public static R0000 createR0000(Properties ctx, Timestamp dateFrom, Timestamp dateTo, int AD_Org_ID, String trxName) throws Exception {
+	public static R0000 createR0000(Properties ctx, Timestamp dateFrom, Timestamp dateTo, int AD_Org_ID, String version, String fin, String trxName) throws Exception {
 
 		MOrgInfo oi = MOrgInfo.get(ctx, AD_Org_ID, trxName);
 		I_W_AD_OrgInfo oiW = POWrapper.create(oi, I_W_AD_OrgInfo.class);
@@ -546,7 +559,7 @@ public class EFDUtil {
 		
 		//
 		R0000 reg = new R0000();
-		reg.setCOD_VER(COD_VER);
+		reg.setCOD_VER(fin);
 		reg.setCOD_FIN(COD_FIN);
 		reg.setDT_INI(dateFrom);
 		reg.setDT_FIN(dateTo);

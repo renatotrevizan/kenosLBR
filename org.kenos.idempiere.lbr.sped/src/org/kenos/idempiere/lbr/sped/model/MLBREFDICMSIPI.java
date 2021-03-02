@@ -359,7 +359,7 @@ public class MLBREFDICMSIPI extends X_LBR_EFDICMSIPI implements DocAction, DocOp
 		
 		
 		// 0000 - dados da empresa
-		bloco0.setR0000(EFDUtil.createR0000(getCtx(), getStartDate(), getEndDate(), getAD_Org_ID(), null));
+		bloco0.setR0000 (EFDUtil.createR0000(getCtx(), getStartDate(), getEndDate(), getAD_Org_ID(), getLBR_COD_VER(), getLBR_COD_FIN(), null));
 		
 		/**
 		 * 	00 - Industrial - Transformação
